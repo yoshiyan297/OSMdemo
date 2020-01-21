@@ -1,0 +1,715 @@
+<!DOCTYPE html "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+
+	<title> NEW 円状マーカー生成　v1.2 test</title>
+
+
+  <style type="text/css">
+    body, div {
+	    margin: 0px;
+	    padding: 0px;
+    }
+
+    p {
+	    margin: 12px 8px;
+	    font-size: 0.9em;
+    }
+
+    div.results {
+	    margin: 0px 8px;
+    }
+
+
+  </style>
+
+
+  <script src="https://openlayers.org/en/v3.20.1/build/ol.js" type="text/javascript">
+  </script>
+<!--  <script type="text/javascript" src="http://maps.google.com/maps/api/js?libraries=geometry&key=AIzaSyB4KjD5FnpB9reGxHNVUiynRoNWwmORr8M">-->
+  </script>
+<!-- <script type="text/javascript" src="http://maps.google.com/maps/api/js?libraries=geometry&sensor=false"></script> -->
+  <script type="text/javascript">
+    function initialize() {
+	    var mapOptions = {
+		    zoom: 10,
+		    center: new google.maps.LatLng(41.782737,140.738897),
+		    draggableCursor: 'crosshair',
+		    scaleControl: true,
+		    mapTypeId: google.maps.MapTypeId.ROADMAP
+	    };
+
+      map = new google.maps.Map(document.getElementById("maparea"), mapOptions);
+      markerCenter = new google.maps.Marker({}); // 中心点
+	    mainLat = []; // 東西南北の基準点の緯度
+	    mainLng = []; // 東西南北の基準点の経度
+
+	//pointAngle = 30;
+	// ポイントごとの差分の角度、設定角度
+	//quaterPoint = (90 / pointAngle) - 1; // ゾーンごとのポイントの数
+
+	//circleRadius = 2000; // 半径(m)
+	//document.getElementById("radius").innerHTML = circleRadius.toFixed(3) + "m";
+
+	   markers = []; // ポイントのマーカー関数
+	   circleMarkers = []; // 円配置用マーカー
+	   markersLat = []; // ポイントの緯度
+	   markersLng = []; // ポイントの経度
+	   google.maps.event.addListener(map, "click", function(event) {
+		   document.getElementById("show_lat").innerHTML = event.latLng.lat().toFixed(8);
+		   document.getElementById("show_lng").innerHTML = event.latLng.lng().toFixed(8);
+
+		   markerCenter.setPosition(event.latLng);
+		   markerCenter.setMap(map);
+		// マーカー設置時、参考用に円を描画する？→出来そうなら
+	   });
+   }
+/*-- ここまで function initialize()   --*/
+
+/*--- ポイント生成  ---*/
+    function basisPointCreate() {
+  	  var pointAngleCheck = pointAngleForm.pointAnglText.value; // ポイントの角度設定してあるか、確認
+	    if(pointAngleCheck == "") {
+		    alert("ポイントの角度を設定してください。");
+	    }
+
+	    else {
+		    var pointAngle = openPointAngle; // ポイントの角度(ローカル用)
+		    var circleRadius = openCircleRadius; // 円の半径(ローカル用)
+	   	  centerLatLng = markerCenter.getPosition();
+		    centerLat = centerLatLng.lat(); // 中心点の緯度
+		    centerLng = centerLatLng.lng(); // 中心点の経度
+
+		    var sampleSpacing = 0.0001; // 基準点作成時の座標の移動距離
+
+		    var sampleLat = centerLat + sampleSpacing; // 基準に計算用緯度
+		    var sampleLng = centerLng + sampleSpacing; // 基準に計算用経度
+
+		    var yAxisSampleLatLng = new google.maps.LatLng(sampleLat, centerLng);  // y軸(緯度)方向のサンプル座標
+		    var xAxisSampleLatLng = new google.maps.LatLng(centerLat, sampleLng);  // x軸(経度)方向のサンプル座標
+
+		    var latSampleDistance = google.maps.geometry.spherical.computeDistanceBetween
+			    (centerLatLng, yAxisSampleLatLng); // サンプル時の緯度方向の変化量(m)
+		    var latReferenceVal = sampleSpacing * circleRadius / latSampleDistance; // 半径距離をy(緯度)方向に移動する際の緯度の量(10進数)
+		    document.getElementById("dLat").innerHTML = latReferenceVal.toFixed(8);
+
+		    var lngSampleDistance = google.maps.geometry.spherical.computeDistanceBetween
+			    (centerLatLng, xAxisSampleLatLng); // サンプル時の経度方向の変化量(m)
+		    var lngReferenceVal = sampleSpacing * circleRadius / lngSampleDistance; // 半径距離をx(経度)方向に移動する際の経度の量(10進数)
+		    document.getElementById("dLng").innerHTML = lngReferenceVal.toFixed(8);
+
+		    // 東用
+		    mainLat[1] = centerLat;
+		    mainLng[1] = centerLng + lngReferenceVal;
+
+		    // 北用
+		    mainLat[2] = centerLat + latReferenceVal;
+		    mainLng[2] = centerLng;
+
+		    // 西用
+		    mainLat[3] = centerLat;
+		    mainLng[3] = centerLng - lngReferenceVal;
+
+		    // 南用
+		    mainLat[4] = centerLat - latReferenceVal;
+		    mainLng[4] = centerLng;
+
+		    var angleVal = pointAngle; // ローカル用ポイントの角度
+
+		    var w = open('', 'subwindow', 'width=600, height=500');
+		    w.document.write("<pre>");
+		    w.document.write(circleRadius +"; " + angleVal + ";" + "<br>");
+
+		    for (var i = 0; i < 360 / angleVal; i++) {
+			   //↓関係ない
+			    var valX = mainLat[1] - centerLat; // 中心点を(0,0)とした時のX座標
+			    var valY = mainLng[1] - centerLng; // 中心点を(0,0)とした時のY座標
+
+			    dLat = Math.cos(angleVal * (Math.PI / 180) * i) *  circleRadius * sampleSpacing / latSampleDistance;
+
+			    dLng = Math.sin(angleVal * (Math.PI / 180) * i) *  circleRadius * sampleSpacing / lngSampleDistance;
+
+			    markersLat[i] = centerLat - dLat; // ポイントの緯度
+			    markersLng[i] = centerLng + dLng; // ポイントの経度
+
+			    circleMarkers[i] = new google.maps.Marker({});
+
+			    circleMarkers[i].setPosition(new google.maps.LatLng(markersLat[i], markersLng[i]));
+			    circleMarkers[i].setMap(map);
+
+			    distanceP = google.maps.geometry.spherical.computeDistanceBetween(centerLatLng, new google.maps.LatLng(markersLat[i], markersLng[i]));
+			    gapDistance = distanceP / circleRadius;
+
+			    var outI = ("0" + i).slice(-2);
+
+			    w.document.write(outI + ": 距離: " + distanceP.toFixed(8) + "; 倍率: " + gapDistance.toFixed(8) + "<br>");
+		    }
+		  w.document.write("</pre>");
+	    }
+    }
+/*--- ここまでポイント生成  ---*/
+
+
+/*--- ポイント全削除処理  ---*/
+    function deletePoint() {
+	    markerCenter.setMap(null);
+	    markerCenter.setPosition(null);
+
+	    var count = 360 / openPointAngle; // ポイントの数(ローカルに代入)
+
+	    for (var i = 0; i < count; i++) {
+		    circleMarkers[i].setMap(null);
+		    markersLat[i] = 0;
+		    markersLng[i] = 0;
+	    }
+      count = 0;
+    }/*--  ここまで　ポイント全削除処理   --*/
+
+/*--- 中心点削除処理  ---*/
+
+    function deleteCenterPoint() {
+	    markerCenter.setMap(null);
+	    markerCenter.setPosition(null);
+    }
+/*--  ここまで　中心点削除処理   --*/
+
+
+/*--- 円状ポイント削除処理  ---*/
+
+    function deleteCirclePoint() {
+	    var count = 360 / openPointAngle; // ポイントの数(ローカルに代入)
+	    for (var i = 0; i < count; i++) {
+		    circleMarkers[i].setMap(null);
+		    markersLat[i] = 0;
+		    markersLng[i] = 0;
+	    }
+	    count = 0;
+    }
+/*--  ここまで　円状ポイント削除処理   --*/
+
+
+    function xmlWindowCreate() {
+	    /*  ↓入力項目判断 */
+	    var cameraAngleCheck = cameraAngleForm.cameraAnglText.value;
+	    var altitudeCheck = altitudeForm.altitudeSetText.value;
+
+	    if(cameraAngleCheck == "") {
+		    alert("カメラアングルを設定してください。");
+	    }
+	    else if(altitudeCheck == "") {
+		    alert("高度を設定してください。");
+ 	    }
+	    else {
+
+	/*  ↑入力項目判断  */
+
+		  var xmlWindow = open('', 'subwindow', 'width=600, height=500'); // 緯度経度表示用ウインド
+
+		/*-- ドローン制御用変数  --*/
+
+		  // ドローンの速度
+		  var speed = openDroneSpeed;
+
+		  // ドローンの高度
+		  var altitude = openDroneAltitude;
+
+		  var actionRepeat = 1; // アクションの回数
+		  var hasAction = "true"; // アクションを行うか
+
+		  //動画か写真かの判別
+		  var actionSelect = actionFlag;
+
+		  var actionParam = 1; // アクションのパラメータ(デフォは1、ヨーの操作の場合向ける方向を入れる)
+
+		  var xmlVersion = "1.0";  // xmlファイルのヘッターの文
+		  var encodingVersion = "utf-8"; // xmlファイルの文字コード
+		  var isLoop = false // 全体のループ
+		  var finishAction = "GO_HOME"; // 終了時の動作
+
+		  //var movingMode = "GSHeadingTowardNextWaypoint"; // 動画の種類、(カメラの方向)
+		  var movingMode = openMovingMode;
+		  // カメラの角度、0～-90で記入
+		  var cameraAngle = openCameraAngle;
+
+		  /*-- ここまでドローン制御用変数  --*/
+
+		  var pointAngle = openPointAngle;
+
+		  xmlWindow.document.write("<pre>");
+
+		  // 共通設定の部分
+		  xmlWindow.document.write("&lt" + "?xml version=" +'"'  + xmlVersion + '"' + " encoding=" + '"' + encodingVersion + '"' +  "?" +  "&gt" + "<br>");
+		  xmlWindow.document.write("&lt" + "FlightPlan" + "&gt" + "<br>");
+		  //xmlWindow.document.write("	" + "&lt" + "isLoop" + "&gt" + isLoop + "&lt" + "/isLoop" + "&gt" + "<br>");
+		  xmlWindow.document.write("	" + "&lt" + "finished_action" + "&gt" + finishAction + "&lt" + "/finished_action" + "&gt" + "<br>");
+		  xmlWindow.document.write("	" + "&lt" + "heading_mode" + "&gt" + movingMode + "&lt" + "/heading_mode" + "&gt" + "<br>");
+		  xmlWindow.document.write("	" + "&lt" + "speed" + "&gt" + "3.0" + "&lt" + "/speed" + "&gt" + "<br>");
+		  xmlWindow.document.write("	" + "&lt" + "waypoint_list" + "&gt" + "<br>");
+
+		  xmlWindow.document.write("</pre>");
+
+		  var pointAngle = openPointAngle;
+
+		  var count = 360 / pointAngle;
+
+		  for (var i = 0; i < count; i++) {
+
+			  var droneYaw = 0;
+
+			  if(i >= 0 && i <= count / 2) {
+				  droneYaw = -1 * pointAngle * i;
+			  }
+			  else if(i > count / 2 && i < count) {
+				  droneYaw = 180 - pointAngle * (i - count / 2);
+			  }
+
+			  if(actionSelect == "shot") {
+				  //xmlファイル用書きだし
+				  xmlWindow.document.write("<pre>");
+				  xmlWindow.document.write("		" + "&lt" + "waypoint" + "&gt" + "&lt");
+				  xmlWindow.document.write("!--" + "(ポイント" + (i) +  ")" + "--" + "&gt" + "<br>");
+
+				  xmlWindow.document.write("			" + "&lt" + "latitude" + "&gt" + markersLat[i].toFixed(8) + "&lt" + "/latitude" +  "&gt" + "<br>");
+				  xmlWindow.document.write("			" + "&lt" + "longitude" + "&gt" + markersLng[i].toFixed(8) + "&lt" + "/longitude" +  "&gt" + "<br>");
+				  xmlWindow.document.write("			" + "&lt" + "speed" + "&gt" +speed + "&lt" + "/speed" +  "&gt" + "<br>");
+				  xmlWindow.document.write("			" + "&lt" + "altitude" + "&gt" + altitude + "&lt" + "/altitude" +  "&gt" + "<br>");
+				  xmlWindow.document.write("			" + "&lt" + "action_repeat_times" + "&gt" + actionRepeat + "&lt" + "/action_repeat_times" +  "&gt" + "<br>");
+
+				  xmlWindow.document.write("			" + "&lt" + "action_list" + "&gt" + "<br>");
+
+				  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+				  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "GIMBAL_PITCH" + "&lt" + "/action_type" +  "&gt" + "<br>");
+				  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + cameraAngle+ "&lt" + "/action_param" +  "&gt" + "<br>");
+
+				  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>")
+
+				  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+				  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "ROTATE_AIRCRAFT" + "&lt" + "/action_type" +  "&gt" + "<br>");
+				  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + droneYaw + "&lt" + "/action_param" +  "&gt" + "<br>");
+
+				  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>");;
+
+				  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+				  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "START_TAKE_PHOTO" + "&lt" + "/action_type" +  "&gt" + "<br>");
+				  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + "1" + "&lt" + "/action_param" +  "&gt" + "<br>");
+
+				  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>");;
+
+				  xmlWindow.document.write("			" + "&lt" + "/action_list" +  "&gt" + "<br>")
+
+				  xmlWindow.document.write("		" + "&lt" + "/waypoint" + "&gt" + "<br>");
+				  xmlWindow.document.write("</pre>");
+
+			  /* 動画の場合 */
+			  }
+        else if(actionSelect == "video") {
+				  //xmlファイル用書きだし
+				  if(i == 0) { // 始点(真南)
+					  xmlWindow.document.write("<pre>");
+					  xmlWindow.document.write("		" + "&lt" + "waypoint" + "&gt" + "&lt");
+					  xmlWindow.document.write("!--" + "(ポイント" + (i) +  ")" + "--" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("			" + "&lt" + "latitude" + "&gt" + markersLat[i].toFixed(8) + "&lt" + "/latitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "longitude" + "&gt" + markersLng[i].toFixed(8) + "&lt" + "/longitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "speed" + "&gt" +speed + "&lt" + "/speed" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "altitude" + "&gt" + altitude + "&lt" + "/altitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "action_repeat_times" + "&gt" + actionRepeat + "&lt" + "/action_repeat_times" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("			" + "&lt" + "action_list" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "GIMBAL_PITCH" + "&lt" + "/action_type" +  "&gt" + "<br>");
+					  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + cameraAngle+ "&lt" + "/action_param" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>")
+
+					  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "ROTATE_AIRCRAFT" + "&lt" + "/action_type" +  "&gt" + "<br>");
+					  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + droneYaw + "&lt" + "/action_param" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>");;
+
+					  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "START_RECORD" + "&lt" + "/action_type" +  "&gt" + "<br>");
+					  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + "1" + "&lt" + "/action_param" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>");;
+
+					  xmlWindow.document.write("			" + "&lt" + "/action_list" +  "&gt" + "<br>")
+
+					  xmlWindow.document.write("		" + "&lt" + "/waypoint" + "&gt" + "<br>");
+					  xmlWindow.document.write("</pre>");
+
+          }else if(i == count -1) { // 終点
+					  xmlWindow.document.write("<pre>");
+					  xmlWindow.document.write("		" + "&lt" + "waypoint" + "&gt" + "&lt");
+					  xmlWindow.document.write("!--" + "(ポイント" + (i) +  ")" + "--" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("			" + "&lt" + "latitude" + "&gt" + markersLat[i].toFixed(8) + "&lt" + "/latitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "longitude" + "&gt" + markersLng[i].toFixed(8) + "&lt" + "/longitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "speed" + "&gt" +speed + "&lt" + "/speed" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "altitude" + "&gt" + altitude + "&lt" + "/altitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "action_repeat_times" + "&gt" + actionRepeat + "&lt" + "/action_repeat_times" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("			" + "&lt" + "action_list" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "GIMBAL_PITCH" + "&lt" + "/action_type" +  "&gt" + "<br>");
+					  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + cameraAngle+ "&lt" + "/action_param" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>")
+
+					  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "ROTATE_AIRCRAFT" + "&lt" + "/action_type" +  "&gt" + "<br>");
+					  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + droneYaw + "&lt" + "/action_param" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>");;
+
+					  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "STOP_RECORD" + "&lt" + "/action_type" +  "&gt" + "<br>");
+					  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + "1" + "&lt" + "/action_param" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>");;
+
+					  xmlWindow.document.write("			" + "&lt" + "/action_list" +  "&gt" + "<br>")
+
+					  xmlWindow.document.write("		" + "&lt" + "/waypoint" + "&gt" + "<br>");
+					  xmlWindow.document.write("</pre>");
+
+				  }else {
+					  xmlWindow.document.write("<pre>");
+					  xmlWindow.document.write("		" + "&lt" + "waypoint" + "&gt" + "&lt");
+					  xmlWindow.document.write("!--" + "(ポイント" + (i) +  ")" + "--" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("			" + "&lt" + "latitude" + "&gt" + markersLat[i].toFixed(8) + "&lt" + "/latitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "longitude" + "&gt" + markersLng[i].toFixed(8) + "&lt" + "/longitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "speed" + "&gt" +speed + "&lt" + "/speed" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "altitude" + "&gt" + altitude + "&lt" + "/altitude" +  "&gt" + "<br>");
+					  xmlWindow.document.write("			" + "&lt" + "action_repeat_times" + "&gt" + actionRepeat + "&lt" + "/action_repeat_times" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("			" + "&lt" + "action_list" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "GIMBAL_PITCH" + "&lt" + "/action_type" +  "&gt" + "<br>");
+					  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + cameraAngle+ "&lt" + "/action_param" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>")
+
+					  xmlWindow.document.write("				" + "&lt" + "action" + "&gt" + "<br>");
+
+					  xmlWindow.document.write("					" + "&lt" + "action_type" + "&gt" + "ROTATE_AIRCRAFT" + "&lt" + "/action_type" +  "&gt" + "<br>");
+					  xmlWindow.document.write("					" + "&lt" + "action_param" + "&gt" + droneYaw + "&lt" + "/action_param" +  "&gt" + "<br>");
+
+					  xmlWindow.document.write("				" + "&lt" + "/action" +  "&gt" + "<br>");;
+
+					  xmlWindow.document.write("			" + "&lt" + "/action_list" +  "&gt" + "<br>")
+
+					  xmlWindow.document.write("		" + "&lt" + "/waypoint" + "&gt" + "<br>");
+					  xmlWindow.document.write("</pre>");
+				  }
+			  }
+		  }
+
+		  xmlWindow.document.write("<pre>");
+		  xmlWindow.document.write("	" + "&lt" + "/waypoint_list" + "&gt" + "<br>");
+		  xmlWindow.document.write("&lt" + "/FlightPlan" + "&gt" + "<br>"); // 締めの文
+		  xmlWindow.document.write("</pre>");
+	  }
+  }
+/*--- 　ここまで　 xmlファイル用　別ウインド出力処理  ---*/
+
+    function getPointAngle(){
+	    var pointAngle = pointAngleForm.pointAnglText.value;  //テキストエリアの値を取得
+
+	    openPointAngle = 30;
+
+	    if(pointAngle == "") {
+		    alert("0～180の数字を入れてください。");
+	    }
+	    else if (pointAngle >= 0 && pointAngle <= 180){
+		    openPointAngle =  pointAngle;
+	    }
+	    else {
+		    alert("0～180の数字を入れてください。");
+		    pointAngleForm.pointAnglText.value = "";
+	    }
+    }
+
+
+    function getCircleRadius(){
+	     var circleRadius = radiusForm.radiusText.value;  //テキストエリアの値を取得
+
+	     openCircleRadius = 1000;
+
+	     if(circleRadius == "") {
+
+		     alert("半径(m)を入れてください。");
+	     }
+	     else if (circleRadius > 0){
+
+		     openCircleRadius =  circleRadius;
+	     }
+	     else {
+
+		     alert("半径(m)を入れてください。");
+		     radiusForm.radiusText.value = "";
+	    }
+    }
+
+    function getFilmType() {
+	    var check1 = document.filmtypeForm.move.checked;
+	    var check2 = document.filmtypeForm.shot.checked;
+
+	    //var target = document.getElementById("output");
+
+	    actionFlag = "video";
+
+	    if (check1 == true) {
+		    actionFlag = "video";
+		//target.innerHTML = "動画がチェック。<br/>";
+	    }
+	    else if (check2 == true) {
+		    actionFlag = "shot";
+		//target.innerHTML = "写真がチェック。<br/>";
+	    }
+    }
+
+    function getMovingMode() {
+	    var check1 = document.movingModeForm.toNext.checked;
+	    var check2 = document.movingModeForm.usingInitial.checked;
+
+	    var target = document.getElementById("output");
+
+	    openMovingMode = "GSHeadingTowardNextWaypoint";
+
+	    if (check1 == true) {
+		  //actionSelect = "video";
+		    target.innerHTML = "Next。<br/>";
+		    openMovingMode = "AUTO";
+	    }
+	    else if (check2 == true) {
+		  //actionSelect = "shot";
+		    target.innerHTML = "UsingIN。<br/>";
+		    openMovingMode = "USING_INITIAL_DIRECTION";
+	    }
+    }
+
+    function getCameraAngle(){
+	    var cameraAngle = cameraAngleForm.cameraAnglText.value;  //テキストエリアの値を取得
+
+	    openCameraAngle = "0";
+
+	    if(cameraAngle == "") {
+
+		    alert("0～90の数字を入れてください。");
+		    //openCameraAngle = "-" + cameraAngle;
+	    }
+	    else if (cameraAngle > 0 && cameraAngle <= 90){
+
+		  //alert("0～90の数字を入れてください。");
+		    openCameraAngle = "-" + cameraAngle;
+	    }
+	    else if (cameraAngle == 0){
+
+		    openCameraAngle = cameraAngle;
+	    }
+	    else {
+
+		    alert("0～90の数字を入れてください。");
+		    cameraAngleForm.cameraAnglText.value = "";
+      }
+    }
+
+    function getSpeed() {
+	    var check1 = document.speedSetForm.lowSpeed.checked;
+	    var check2 = document.speedSetForm.midSpeed.checked;
+	    var check3 = document.speedSetForm.highSpeed.checked;
+
+	    var target = document.getElementById("output2");
+
+	    openDroneSpeed = "3.0";
+
+	    if (check1 == true) {
+		  //actionSelect = "video";
+		    openDroneSpeed = "3.0";
+		    target.innerHTML = "3.0。<br/>";
+	    }
+	    else if (check2 == true) {
+		  //actionSelect = "shot";
+		    target.innerHTML = "4.0。<br/>";
+		    openDroneSpeed = "4.0";
+	    }
+	    else if (check3 == true) {
+		    //actionSelect = "shot";
+		    target.innerHTML = "5.0。<br/>";
+		    openDroneSpeed = "5.0";
+	    }
+    }
+
+    function getAltitude(){
+	    var droneAltitude = altitudeForm.altitudeSetText.value;  //テキストエリアの値を取得
+
+	    openDroneAltitude = "100";
+
+	    if(droneAltitude == "") {
+
+		    alert("0～500の数字を入れてください。");
+	    }
+	    else if (droneAltitude >= 0 && droneAltitude <= 500){
+
+		    openDroneAltitude = droneAltitude;
+	    }
+	    else {
+
+		    alert("0～500の数字を入れてください。");
+		    altitudeForm.altitudeSetText.value = "";
+	    }
+    }
+
+  </script>
+</head>
+
+<body>
+<body onload="initialize()">
+<!--  <script type="text/javascript"><!
+    var ID="100148196";
+    var AD=4;
+    var FRAME=0;
+</script>-->
+
+<!--  <script type="text/javascript">
+  </script>
+<!</div>-->
+	<font size="2">
+    <div id="map" style="width: 700px; height: 550px; float: left"></div>
+
+    <script>
+                var map = new ol.Map({
+                    target: "map",
+                    renderer: ['canvas', 'dom'],
+                    layers: [
+                        new ol.layer.Tile({
+                            source: new ol.source.XYZ({
+                                attributions: [
+                                    new ol.Attribution({
+                                        html: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>"
+                                    })
+                                ],
+                                url: "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+                                projection: "EPSG:3857"
+                            })
+                        })
+                    ],
+                    controls: ol.control.defaults({
+                        attributionOptions: ({
+                            collapsible: false
+                        })
+                    }),
+                    view: new ol.View({
+                        projection: "EPSG:3857",
+                        center: ol.proj.transform([138.7313889, 35.3622222], "EPSG:4326", "EPSG:3857"),
+                        maxZoom: 18,
+                        zoom: 5
+                    })
+                });
+            </script>
+
+
+    <div style="width: 180px; height: 550px; float: left">
+
+	  	<form name="radiusForm" action="">
+          <p>■円の半径(m)</p>
+      		<p><input type="text" name="radiusText">
+     		    <input type="button" value="設定" onclick="getCircleRadius();"/>
+          </p>
+      </form>
+
+		  <form name="pointAngleForm" action="">
+    	  	<p>■ポイントの角度</p>
+    		  <p><input type="text" name="pointAnglText">
+    		     <input type="button" value="設定" onclick="getPointAngle();"/>
+         </p>
+      </form>
+	    <p>■中心点の緯度</p>
+	    <div id="show_lat" class="results"></div>
+		  <p>■中心点経度</p>
+		  <div id="show_lng" class="results"></div>
+
+	 	  <p>■半径分動かす緯度の量</p>
+      <div id="dLat" class="results"></div>
+	    <p>■半径分動かす経度の量</p>
+		  <div id="dLng" class="results"></div>
+		  <p>■distanceY</p>
+	    <div id="dy" class="results"></div>
+		  <p>■distanceX</p>
+		  <div id="dx" class="results"></div>
+
+    </div>
+
+	  <div style="width: 150px; height: 550px; float: left">
+	    <p><input type="button" value="ポイント生成&表示" onclick="basisPointCreate();"/></p>
+
+      <p><input type="button" value="中心点の消去" onclick="deleteCenterPoint();"/></p>
+      <p><input type="button" value="円状ポイントの消去" onclick="deleteCirclePoint();"/></p>
+      <p><input type="button" value="ポイント全消去" onclick="deletePoint();"/></p>
+
+      <form name="filmtypeForm" action="">
+        ■撮影の種類</br>
+      		<input id="move" name="filmtype" type="radio" onchange="getFilmType();" />
+    	    	<label for="Radio1">動画</label></br>
+    		 <input id="shot" name="filmtype" type="radio" onchange="getFilmType();" />
+    		   <label for="Radio2">写真</label></br>
+      </form>
+
+      <form name="cameraAngleForm" action="">
+    	  ■カメラアングル 0～90</br>
+    		  <input type="text" name="cameraAnglText">
+    		  <input type="button" value="設定" onclick="getCameraAngle();"/>
+      </form>
+
+      <form name="altitudeForm" action="">
+    	  ■高度 0～150</br>
+    		  <input type="text" name="altitudeSetText">
+    		  <input type="button" value="設定" onclick="getAltitude();"/>
+      </form>
+
+      <form name="movingModeForm" action="">
+    	  ■MovingMode</br>
+    		  <input id="toNext" name="movingMode" type="radio" onchange="getMovingMode();" />
+    		    <label for="Radio3">TowardNextWaypoint</label></br>
+    		  <input id="usingInitial" name="movingMode" type="radio" onchange="getMovingMode();" />
+    		    <label for="Radio4">UsingInitialDirection</label></br>
+      </form>
+    </div>
+
+    <div id="output"></div>
+
+    <form name="speedSetForm" action="">
+    	■Speed</br>
+    		<input id="lowSpeed" name="speedSet" type="radio" onchange="getSpeed();" />
+    		  <label for="Radio5">3.0</label></br>
+    	  <input id="midSpeed" name="speedSet" type="radio" onchange="getSpeed();" />
+    		  <label for="Radio6">4.0</label></br>
+    		<input id="highSpeed" name="speedSet" type="radio" onchange="getSpeed();" />
+    		  <label for="Radio7">5.0</label></br>
+    </form>
+
+    <div id="output2"></div>
+      <p><input type="button" value="XML生成" onclick="xmlWindowCreate();"/></p>
+
+  </font>
+</body>
+</html>
